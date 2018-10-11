@@ -83,7 +83,10 @@ class SharePhotoViewController: UIViewController {
                     return
                 }
                 print("sucessfully uploaded post")
+                
                 self.dismiss(animated: true, completion: nil)
+                let name = NSNotification.Name(rawValue: "FeedUpdated")
+                NotificationCenter.default.post(name:name,object:nil)
         }
     }
 }

@@ -7,9 +7,16 @@
 //
 
 import UIKit
+protocol HomePostCellDelegate {
+    func didTabComments(post:Post)
+    func didLike(for cell:HomeFeedCell)
+}
 class HomeFeedCell: UICollectionViewCell {
+    var delegate:HomePostCellDelegate?
     var post:Post?{
         didSet{
+            guard let hasLiked = post?.hasLiked else {return}
+            likeButton.setImage(hasLiked ?  #imageLiteral(resourceName: "like_selected").withRenderingMode(.alwaysOriginal): #imageLiteral(resourceName: "like_unselected").withRenderingMode(.alwaysOriginal) , for: .normal)
             guard let postImageURL = post?.postImageUrl else {return}
             if let url = URL(string: postImageURL)
             {
@@ -30,17 +37,21 @@ class HomeFeedCell: UICollectionViewCell {
         let attributedText = NSMutableAttributedString(string: post.user.username, attributes: [NSAttributedStringKey.font:UIFont.boldSystemFont(ofSize: 14)])
 
         attributedText.append(NSAttributedString(string: " \(post.caption)", attributes: [NSAttributedStringKey.font:UIFont.systemFont(ofSize: 14)]))
-        attributedText.append(NSAttributedString(string: "\n1 week ago", attributes: [NSAttributedStringKey.font:UIFont.systemFont(ofSize: 14),NSAttributedStringKey.foregroundColor:UIColor.gray]))
+
+        attributedText.append(NSAttributedString(string: "\n\(post.creationDate.timeAgoDisplay())", attributes: [NSAttributedStringKey.font:UIFont.systemFont(ofSize: 14),NSAttributedStringKey.foregroundColor:UIColor.gray]))
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineSpacing = 4
         attributedText.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSMakeRange(0, attributedText.length))
         captionLabel.attributedText = attributedText
+        
     }
     let postPhotoImageView:UIImageView  = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
         iv.clipsToBounds = true
-        iv.backgroundColor = .blue
+        iv.image = nil
+        iv.sd_setIndicatorStyle(.gray)
+        iv.sd_showActivityIndicatorView()
         return iv
     }()
     let userProfileImageView:UIImageView = {
@@ -74,15 +85,17 @@ class HomeFeedCell: UICollectionViewCell {
         super.init(frame: frame)
         setupViews()
     }
-    let likeButton:UIButton = {
+    lazy var likeButton:UIButton = {
        let button = UIButton()
         button.setImage(#imageLiteral(resourceName: "like_unselected").withRenderingMode(.alwaysOriginal), for: .normal)
+        button.addTarget(self, action: #selector(handleLike), for: .touchUpInside)
         return button
     }()
     
-    let commentButton:UIButton = {
+    lazy var commentButton:UIButton = {
         let button = UIButton()
         button.setImage(#imageLiteral(resourceName: "comment").withRenderingMode(.alwaysOriginal), for: .normal)
+        button.addTarget(self, action: #selector(handleComments), for: .touchUpInside)
         return button
     }()
     
@@ -115,17 +128,26 @@ class HomeFeedCell: UICollectionViewCell {
         userNameLabel.centerYAnchor.constraint(equalTo: userProfileImageView.centerYAnchor).isActive = true
         optionsButton.anchorToView(left: userNameLabel.rightAnchor,right: rightAnchor, padding: .init(top: 0, left: 8, bottom: 0, right: 8),size:.init(width: 44, height: 0))
         optionsButton.centerYAnchor.constraint(equalTo: userNameLabel.centerYAnchor).isActive = true
-     
         setupActionButtons()
         captionLabel.anchorToView(top: likeButton.bottomAnchor, left: leftAnchor, bottom: bottomAnchor, right: rightAnchor, padding: .init(top: 0, left: 8, bottom: 0, right: 8))
     }
     func setupActionButtons()
     {
-        
         addSubview(stackView)
         stackView.anchorToView(top: postPhotoImageView.bottomAnchor, left: leftAnchor,padding:.init(top: 0, left: 8, bottom: 0, right: 0) ,size: .init(width: 120, height: 50))
         addSubview(ribonButton)
         ribonButton.anchorToView(top: postPhotoImageView.bottomAnchor,  right: rightAnchor, padding: .init(top: 0, left: 0, bottom: 0, right: 8), size: .init(width: 40, height: 50))
+    }
+    @objc func handleComments()
+    {
+        guard let post = post else {
+            return
+        }
+        delegate?.didTabComments(post:post)
+    }
+    @objc func handleLike()
+    {
+        delegate?.didLike(for: self)
     }
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")

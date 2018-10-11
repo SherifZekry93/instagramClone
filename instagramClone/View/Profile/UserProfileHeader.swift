@@ -9,7 +9,12 @@
 import UIKit
 import Firebase
 import SDWebImage
+protocol UserProfileHeaderDelegate {
+    func didChangeToListView()
+    func didChangeToGridView()
+}
 class UserProfileHeader: UICollectionViewCell {
+    var delegate:UserProfileHeaderDelegate?
     var user:User?{
         didSet{
             guard let user = user else {return}
@@ -100,16 +105,18 @@ class UserProfileHeader: UICollectionViewCell {
         return iv
     }()
     
-    let gridButton:UIButton = {
+    lazy var gridButton:UIButton = {
        let button = UIButton(type: .system)
         button.setImage(#imageLiteral(resourceName: "grid"), for: .normal)
+        button.addTarget(self, action: #selector(handleGridView), for: .touchUpInside)
     return button
     }()
     
-    let listButton:UIButton = {
+    lazy var listButton:UIButton = {
         let button = UIButton(type: .system)
         button.setImage(#imageLiteral(resourceName: "list"), for: .normal)
         button.tintColor = UIColor(white: 0, alpha: 0.2)
+        button.addTarget(self, action: #selector(handleListView), for: .touchUpInside)
         return button
     }()
     
@@ -207,7 +214,18 @@ class UserProfileHeader: UICollectionViewCell {
         editProfileFollowButton.addSubview(activityIndicator)
         activityIndicator.anchorToView(centerH: true, centerV: true)
     }
-    
+    @objc func handleListView(_ sender:UIButton)
+    {
+        sender.tintColor = UIColor.rgb(red: 17, green: 154, blue: 237)
+        gridButton.tintColor = UIColor(white: 0, alpha: 0.2)
+        delegate?.didChangeToListView()
+    }
+    @objc func handleGridView(_ sender:UIButton)
+    {
+        sender.tintColor = UIColor.rgb(red: 17, green: 154, blue: 237)
+        listButton.tintColor = UIColor(white: 0, alpha: 0.2)
+        delegate?.didChangeToGridView()
+    }
     required init?(coder aDecoder: NSCoder)
     {
         fatalError("init(coder:) has not been implemented")

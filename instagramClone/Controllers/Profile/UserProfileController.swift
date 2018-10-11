@@ -8,12 +8,25 @@
 
 import UIKit
 import Firebase
-class UserProfileController: UICollectionViewController,UICollectionViewDelegateFlowLayout {
+class UserProfileController: UICollectionViewController,UICollectionViewDelegateFlowLayout,UserProfileHeaderDelegate {
+    var isgrid = true
+    func didChangeToListView() {
+        isgrid = false
+        self.collectionView?.reloadData()
+    }
+    
+    func didChangeToGridView() {
+        isgrid = true
+        self.collectionView?.reloadData()
+    }
+    
     let headerID = "headerID"
     let cellID = "cellID"
+    let postCellID = "postCellID"
     var user:User?{
         didSet{
-            fetchPosts()
+            //fetchPosts()
+            paginatePosts()
         }
     }
     var uid:String?
@@ -29,11 +42,14 @@ class UserProfileController: UICollectionViewController,UICollectionViewDelegate
         collectionView?.backgroundColor = .white
         collectionView?.register(UserProfileHeader.self, forSupplementaryViewOfKind: UICollectionElementKindSectionHeader, withReuseIdentifier: headerID)
         collectionView?.register(ProfilePostPhoto.self, forCellWithReuseIdentifier: cellID)
+        collectionView?.register(HomeFeedCell.self, forCellWithReuseIdentifier: postCellID)
     }
     func fetchUser()
     {
         let userID = uid ?? (Auth.auth().currentUser?.uid) ?? ""
-        Database.fetchUser(userID: userID) { (user) in
+        Database.fetchUser(userID: userID)
+        {
+            (user) in
             self.user = user
             self.navigationItem.title = user.username
             self.collectionView?.reloadData()
@@ -45,6 +61,7 @@ class UserProfileController: UICollectionViewController,UICollectionViewDelegate
         {
             header.user = user
         }
+        header.delegate = self
         return header
     }
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
@@ -54,14 +71,39 @@ class UserProfileController: UICollectionViewController,UICollectionViewDelegate
         return posts.count
     }
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let width = (view.frame.width - 2) / 3
-        return CGSize(width: width, height: width)
+        if isgrid
+        {
+            let width = (view.frame.width - 2) / 3
+            return CGSize(width: width, height: width)
+        }
+        let frame = CGRect(x: 0, y: 0, width: view.frame.width, height: 56)
+        let dummyCell = HomeFeedCell(frame: frame)
+        dummyCell.post = posts[indexPath.item]
+        dummyCell.layoutIfNeeded()
+        let estimatedsize = dummyCell.systemLayoutSizeFitting(CGSize(width: frame.width, height: 1000))
+        let height = estimatedsize.height//max(56, estimatedsize.height)
+        let width = (view.frame.width)
+        return CGSize(width: width, height: height)
     }
     
     override func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: cellID, for: indexPath) as! ProfilePostPhoto
-        cell.post = posts[indexPath.item]
-        return cell
+        if indexPath.item == self.posts.count - 1
+        {
+            print("paginate")
+        }
+        if isgrid
+        {   
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: cellID, for: indexPath) as! ProfilePostPhoto
+            cell.post = posts[indexPath.item]
+            return cell
+
+        }
+        else
+        {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: postCellID, for: indexPath) as! HomeFeedCell
+            cell.post = posts[indexPath.item]
+            return cell
+        }
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
@@ -92,9 +134,27 @@ class UserProfileController: UICollectionViewController,UICollectionViewDelegate
         logoutAlert.addAction(cancelLogoutAction)
         present(logoutAlert, animated: true, completion: nil)
     }
+    fileprivate func paginatePosts()
+    {
+        guard let user = user else {return}
+        let ref = Database.database().reference().child("posts").child(user.uid)
+        let query = ref.queryOrderedByKey().queryLimited(toFirst: 4)
+        query.observe(.value, with: { (snap) in
+            if let dictionary = snap.value as? [String:Any]
+            {
+                dictionary.forEach({ (key,value) in
+                        let post = Post(user: user, dictionary: value as! [String : Any])
+                        self.posts.append(post)
+                        self.collectionView?.reloadData()
+                })
+            }
+        }) { (err) in
+            print(err)
+        }
+    }
     fileprivate func fetchPosts()
     {
-        guard let currentUserID = user?.uid else {return}//
+        guard let currentUserID = user?.uid else {return}
         Database.database().reference().child("posts").child(currentUserID).queryOrdered(byChild: "creationDate").observe(.childAdded) { (snapShot) in
             guard let dictionary = snapShot.value as? [String:Any] else {return}
             guard let user = self.user else {return}
